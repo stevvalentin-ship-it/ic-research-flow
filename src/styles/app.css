@@ -1,0 +1,11 @@
+.site-shell { min-height: 100vh; background: var(--ice); }
+.topbar { height: 72px; padding: 0 40px; display: flex; align-items: center; gap: 12px; background: var(--navy); color: white; }
+.topbar strong { font-size: 18px; letter-spacing: .08em; }
+.topbar span { color: #86a6ca; font-size: 9px; letter-spacing: .2em; }
+.entry-grid { max-width: 1120px; margin: 0 auto; padding: 64px 32px; display: grid; grid-template-columns: 1.2fr .8fr; gap: 20px; }
+.entry-grid section { min-height: 280px; padding: 36px; background: var(--panel); border: 1px solid var(--line); border-radius: 20px; }
+.entry-grid h1, .entry-grid h2 { margin: 0 0 12px; color: var(--ink); }
+.entry-grid h1 { font-family: "Noto Serif SC", "Songti SC", serif; font-size: 38px; }
+.entry-grid p { color: var(--muted); line-height: 1.75; }
+.entry-grid .eyebrow { color: var(--blue); font-size: 10px; font-weight: 800; letter-spacing: .2em; }
+@media (max-width: 760px) { .entry-grid { grid-template-columns: 1fr; padding: 32px 16px; } .topbar { padding: 0 20px; } }
