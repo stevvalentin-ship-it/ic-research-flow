@@ -13,4 +13,15 @@ describe('GraphWorkbench', () => {
     expect(screen.getByText('综合得分')).toBeInTheDocument()
     expect(screen.getByText(/PAGE 7/)).toBeInTheDocument()
   })
+
+  it('selects the first paper when a new result set replaces the old one', () => {
+    const first = { id: 'old', title: 'Old result', authors: [] } as unknown as PaperRecord
+    const next = { id: 'new', title: 'New result', authors: [] } as unknown as PaperRecord
+    const makeScore = (paperId: string) => ({ paperId, total: .8, relevance: .8, influence: .8, frontier: .8, evidence: .8, bridge: .8, role: 'hub', reason: '' }) as PaperScore
+    const { rerender } = render(<GraphWorkbench papers={[first]} analyses={[]} scores={[makeScore('old')]} />)
+
+    rerender(<GraphWorkbench papers={[next]} analyses={[]} scores={[makeScore('new')]} />)
+
+    expect(screen.getByRole('heading', { name: 'New result' })).toBeInTheDocument()
+  })
 })

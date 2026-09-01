@@ -9,7 +9,7 @@ export function buildInfluenceGraph(papers: PaperRecord[], analyses: PaperAnalys
   const scoreById = new Map(scores.map((score) => [score.paperId, score]))
   const ids = new Set(papers.map((paper) => paper.id))
   const nodes: GraphPaperNode[] = papers.map((paper) => ({ id: paper.id, title: paper.title, year: paper.year, role: scoreById.get(paper.id)?.role ?? 'foundation', score: scoreById.get(paper.id)?.total ?? 0 }))
-  const edges: GraphCitationEdge[] = analyses.flatMap((analysis) => analysis.references
+  const edges: GraphCitationEdge[] = analyses.filter((analysis) => ids.has(analysis.paperId)).flatMap((analysis) => analysis.references
     .filter((reference) => reference.matchedPaperId && ids.has(reference.matchedPaperId))
     .map((reference) => ({ source: analysis.paperId, target: reference.matchedPaperId!, relation: reference.relation, weight: weights[reference.relation] })))
   return { nodes, edges }

@@ -1,5 +1,5 @@
 import { BookMarked, GitFork, ListFilter, Network, Trees } from 'lucide-react'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import type { PaperAnalysis, PaperRecord, PaperScore } from '../../domain/types'
 import { buildInfluenceGraph } from './graphModel'
 import { InfluenceGraph } from './InfluenceGraph'
@@ -9,6 +9,9 @@ import { PaperDetailPanel } from './PaperDetailPanel'
 export function GraphWorkbench({ papers, analyses, scores }: { papers: PaperRecord[]; analyses: PaperAnalysis[]; scores: PaperScore[] }) {
   const [tab, setTab] = useState<'influence' | 'content' | 'papers'>('influence')
   const [selectedId, setSelectedId] = useState(papers[0]?.id)
+  useEffect(() => {
+    if (!papers.some((paper) => paper.id === selectedId)) setSelectedId(papers[0]?.id)
+  }, [papers, selectedId])
   const graph = useMemo(() => buildInfluenceGraph(papers, analyses, scores), [papers, analyses, scores])
   const analysisById = new Map(analyses.map((analysis) => [analysis.paperId, analysis]))
   const scoreById = new Map(scores.map((score) => [score.paperId, score]))
