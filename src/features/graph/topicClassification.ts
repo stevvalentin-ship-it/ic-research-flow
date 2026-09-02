@@ -63,12 +63,21 @@ function meaningfulFocusCandidates(paper: PaperRecord, analysis: PaperAnalysis |
   return result
 }
 
-export function classifyPaperTopic(paper: PaperRecord, analysis: PaperAnalysis | undefined): string {
+export interface TopicParts {
+  broad: string
+  focus: string
+}
+
+export function classifyPaperTopicParts(paper: PaperRecord, analysis: PaperAnalysis | undefined): TopicParts {
   const text = paperText(paper, analysis)
   const broad = DYNAMIC_TOPIC_RULES.find((item) => item.patterns.test(text))?.label ?? '其他'
-  const focuses = meaningfulFocusCandidates(paper, analysis)
-  if (focuses.length) return `${broad} · ${focuses[0]}`
-  return broad
+  const focus = meaningfulFocusCandidates(paper, analysis)[0] ?? '综合研究'
+  return { broad, focus }
+}
+
+export function classifyPaperTopic(paper: PaperRecord, analysis: PaperAnalysis | undefined): string {
+  const parts = classifyPaperTopicParts(paper, analysis)
+  return parts.focus === '综合研究' ? parts.broad : `${parts.broad} · ${parts.focus}`
 }
 
 export function findSecondaryFocus(paper: PaperRecord, analysis: PaperAnalysis | undefined, used: Set<string>): string {
