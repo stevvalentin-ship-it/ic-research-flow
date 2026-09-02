@@ -68,6 +68,15 @@ describe('DeepSeekClient', () => {
     expect(fetchImpl.mock.calls[0][0]).toBe('http://127.0.0.1:8000/v1/chat/completions')
   })
 
+  it('routes the official API through the same-origin development proxy when enabled', async () => {
+    const fetchImpl = vi.fn<typeof fetch>().mockResolvedValue(jsonResponse('{"ok":true}'))
+    const client = new DeepSeekClient(fetchImpl, { useOfficialDevProxy: true })
+
+    await client.testConnection(settings)
+
+    expect(fetchImpl.mock.calls[0][0]).toBe('/__deepseek_api__/chat/completions')
+  })
+
   it.each([
     ['an unrelated JSON response', new Response('{}', { status: 200, headers: { 'Content-Type': 'application/json' } })],
     ['a null JSON response', new Response('null', { status: 200, headers: { 'Content-Type': 'application/json' } })],

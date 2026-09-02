@@ -13,6 +13,10 @@ interface ChatOptions {
   requireContent?: boolean
 }
 
+interface DeepSeekClientOptions {
+  useOfficialDevProxy?: boolean
+}
+
 export interface ConnectionResult { ok: true; model: string }
 export interface QueryExpansion { termsZh: string[]; termsEn: string[]; acronyms: string[]; exclude: string[] }
 export interface RerankCandidate { paperId: string; title: string; summary: string; domains: string[] }
@@ -69,15 +73,25 @@ function chatEndpoint(baseUrl: string): string {
   return endpoint.toString()
 }
 
+function runtimeEndpoint(endpoint: string, useOfficialDevProxy: boolean): string {
+  const parsed = new URL(endpoint)
+  return useOfficialDevProxy && parsed.origin === 'https://api.deepseek.com'
+    ? `/__deepseek_api__${parsed.pathname}${parsed.search}`
+    : endpoint
+}
+
 function stringList(value: unknown): string[] {
   return Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string') : []
 }
 
 export class DeepSeekClient {
-  constructor(private readonly fetchImpl: typeof fetch = fetch) {}
+  constructor(
+    private readonly fetchImpl: typeof fetch = fetch,
+    private readonly options: DeepSeekClientOptions = {},
+  ) {}
 
   private async chat(settings: ApiSettings, messages: ChatMessage[], options: ChatOptions = {}): Promise<{ content: string; model: string }> {
-    const endpoint = chatEndpoint(settings.baseUrl)
+    const endpoint = runtimeEndpoint(chatEndpoint(settings.baseUrl), this.options.useOfficialDevProxy === true)
     const model = settings.model.trim()
     const body: Record<string, unknown> = { model, messages, stream: false }
     if (options.maxTokens) body.max_tokens = options.maxTokens
@@ -165,4 +179,4 @@ export class DeepSeekClient {
   }
 }
 
-export const deepSeekClient = new DeepSeekClient()
+export const deepSeekClient = new DeepSeekClient(fetch, { useOfficialDevProxy: import.meta.env.DEV })
