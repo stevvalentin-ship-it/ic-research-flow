@@ -5,7 +5,7 @@ const API_KEY = 'icrf.apiKey'
 
 const defaults: ApiSettings = {
   baseUrl: 'https://api.deepseek.com',
-  model: 'deepseek-v4-flash',
+  model: 'deepseek-v4-flash-vision-exp',
   apiKey: '',
 }
 

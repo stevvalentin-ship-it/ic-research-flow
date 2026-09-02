@@ -35,6 +35,34 @@ describe('DeepSeekClient', () => {
     expect(JSON.parse(String(init?.body))).toMatchObject({ model: 'deepseek-v4-flash', max_tokens: 8 })
   })
 
+  it('sends page images to the vision model for scanned PDFs', async () => {
+    const analysisJson = JSON.stringify({
+      summary: 'test',
+      domains: [],
+      facets: { objects: [], problems: [], methods: [], processNodes: [], metrics: [], applications: [], findings: [], limitations: [] },
+      keywordsZh: [],
+      keywordsEn: [],
+      references: [],
+      evidence: [],
+    })
+    const fetchImpl = vi.fn<typeof fetch>().mockResolvedValue(jsonResponse(analysisJson))
+    const client = new DeepSeekClient(fetchImpl)
+
+    await client.analyzePaper({
+      paperId: 'paper-1',
+      title: 'A scanned paper',
+      packet: '',
+      images: [{ page: 1, dataUrl: 'data:image/jpeg;base64,abc' }],
+    }, settings)
+
+    const [, init] = fetchImpl.mock.calls[0]
+    const body = JSON.parse(String(init?.body))
+    expect(body.messages[1].content).toEqual([
+      { type: 'text', text: expect.any(String) },
+      { type: 'image_url', image_url: { url: 'data:image/jpeg;base64,abc', detail: 'high' } },
+    ])
+  })
+
   it('calls fetch as a plain function so native fetch keeps its browser this-binding', async () => {
     const fetchImpl = vi.fn(function (this: unknown) {
       expect(this).toBeUndefined()

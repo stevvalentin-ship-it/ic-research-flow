@@ -34,7 +34,7 @@ export function ApiSettingsForm({ onConnectionChange }: { onConnectionChange: (v
       </div>
       <div className="form-grid">
         <label><span><Server size={14} />API 地址</span><input value={settings.baseUrl} onChange={(event) => update('baseUrl', event.target.value)} /></label>
-        <label><span><PlugZap size={14} />模型</span><input list="deepseek-models" value={settings.model} onChange={(event) => update('model', event.target.value)} /><datalist id="deepseek-models"><option value="deepseek-v4-flash" /><option value="deepseek-v4-pro" /></datalist></label>
+        <label><span><PlugZap size={14} />模型</span><input list="deepseek-models" value={settings.model} onChange={(event) => update('model', event.target.value)} /><datalist id="deepseek-models"><option value="deepseek-v4-flash-vision-exp" /><option value="deepseek-v4-flash" /><option value="deepseek-v4-pro" /></datalist></label>
         <label className="full-field"><span><KeyRound size={14} />API Key</span><div className="key-input"><input aria-label="API Key" type={showKey ? 'text' : 'password'} value={settings.apiKey} placeholder="sk-••••••••••••••••" onChange={(event) => update('apiKey', event.target.value)} /><button type="button" aria-label="显示密钥" onClick={() => setShowKey(!showKey)}>{showKey ? <EyeOff size={16} /> : <Eye size={16} />}</button></div></label>
       </div>
       <div className="api-actions">

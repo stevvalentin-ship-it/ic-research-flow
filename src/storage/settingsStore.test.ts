@@ -9,7 +9,7 @@ describe('settingsStore', () => {
   it('uses the current DeepSeek model for a first-time visitor', () => {
     expect(loadApiSettings()).toMatchObject({
       baseUrl: 'https://api.deepseek.com',
-      model: 'deepseek-v4-flash',
+      model: 'deepseek-v4-flash-vision-exp',
     })
   })
 
@@ -19,7 +19,7 @@ describe('settingsStore', () => {
       model,
     }))
 
-    expect(loadApiSettings().model).toBe('deepseek-v4-flash')
+    expect(loadApiSettings().model).toBe('deepseek-v4-flash-vision-exp')
   })
 
   it('normalizes copied settings before storing them', () => {

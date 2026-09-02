@@ -2,7 +2,11 @@ import type { ApiSettings, PaperAnalysis } from '../domain/types'
 import { extractJsonObject, normalizePaperAnalysis } from './analysisSchema'
 import { analysisSystemPrompt, analysisUserPrompt, queryExpansionSystemPrompt, rerankSystemPrompt } from './prompts'
 
-interface ChatMessage { role: 'system' | 'user'; content: string }
+type ChatContentPart =
+  | { type: 'text'; text: string }
+  | { type: 'image_url'; image_url: { url: string; detail?: 'original' | 'high' | 'low' } }
+
+interface ChatMessage { role: 'system' | 'user' | 'assistant'; content: string | ChatContentPart[] }
 interface ChatResponse {
   model?: string
   choices?: Array<{ message?: { content?: string | null } }>
@@ -141,10 +145,24 @@ export class DeepSeekClient {
     return { ok: true, model: result.model }
   }
 
-  async analyzePaper(input: { paperId: string; title: string; packet: string }, settings: ApiSettings): Promise<PaperAnalysis> {
+  async analyzePaper(input: {
+    paperId: string
+    title: string
+    packet: string
+    images?: Array<{ page: number; dataUrl: string }>
+  }, settings: ApiSettings): Promise<PaperAnalysis> {
+    const userContent: ChatMessage['content'] = input.images?.length
+      ? [
+          { type: 'text' as const, text: `${analysisUserPrompt(input.title, input.packet)} 若论文文本为空，请根据附带的页面图片识别内容，并严格按相同 JSON 结构输出。` },
+          ...input.images.map((image) => ({
+            type: 'image_url' as const,
+            image_url: { url: image.dataUrl, detail: 'high' as const },
+          })),
+        ]
+      : analysisUserPrompt(input.title, input.packet)
     const result = await this.chat(settings, [
       { role: 'system', content: analysisSystemPrompt },
-      { role: 'user', content: analysisUserPrompt(input.title, input.packet) },
+      { role: 'user', content: userContent },
     ])
     return normalizePaperAnalysis(input.paperId, extractJsonObject(result.content))
   }

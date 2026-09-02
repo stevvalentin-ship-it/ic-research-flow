@@ -5,17 +5,26 @@ import type { ApiSettings, PaperRecord } from '../../domain/types'
 import { FileDropzone } from '../../components/FileDropzone'
 import { ApiSettingsForm } from '../settings/ApiSettingsForm'
 import { fingerprintFile } from '../../ingestion/fileFingerprint'
-import { parsePdf } from '../../ingestion/pdfParser'
+import { parsePdf, renderPdfPageAsDataUrl } from '../../ingestion/pdfParser'
 import { buildAnalysisPacket } from '../../ingestion/analysisPacket'
 import { paperRepository } from '../../storage/paperRepository'
 import { researchDatabase } from '../../storage/database'
 import { deepSeekClient } from '../../api/deepseekClient'
 
+
+function selectVisionPages(pageCount: number): number[] {
+  const pages = new Set([1, pageCount])
+  if (pageCount > 2) pages.add(Math.ceil(pageCount / 2))
+  if (pageCount > 4) pages.add(Math.ceil(pageCount * 0.25))
+  if (pageCount > 6) pages.add(Math.ceil(pageCount * 0.75))
+  return Array.from(pages).sort((a, b) => a - b).slice(0, 4)
+}
+
 export function OnboardingPage() {
   const navigate = useNavigate()
   const [files, setFiles] = useState<File[]>([])
   const [connected, setConnected] = useState(false)
-  const [settings, setSettings] = useState<ApiSettings>({ baseUrl: 'https://api.deepseek.com', model: 'deepseek-v4-flash', apiKey: '' })
+  const [settings, setSettings] = useState<ApiSettings>({ baseUrl: 'https://api.deepseek.com', model: 'deepseek-v4-flash-vision-exp', apiKey: '' })
   const [running, setRunning] = useState(false)
   const [progress, setProgress] = useState({ done: 0, label: '' })
   const [error, setError] = useState('')
@@ -38,8 +47,15 @@ export function OnboardingPage() {
         }
         await paperRepository.put(record)
         await researchDatabase.jobs.update(`job-${id}`, { stage: 'analyzing', progress: 42, updatedAt: Date.now() })
-        setProgress({ done: index, label: `DeepSeek 正在理解 ${file.name}` })
-        const analysis = await deepSeekClient.analyzePaper({ paperId: id, title: parsed.title, packet: buildAnalysisPacket(parsed) }, settings)
+        const packet = buildAnalysisPacket(parsed)
+        const images = parsed.isScanned
+          ? await Promise.all(selectVisionPages(parsed.pageCount).map(async (page) => ({
+              page,
+              dataUrl: await renderPdfPageAsDataUrl(file, page, { scale: 1.5 }),
+            })))
+          : []
+        setProgress({ done: index, label: parsed.isScanned ? `DeepSeek 正在识别 ${file.name} 的页面图片` : `DeepSeek 正在理解 ${file.name}` })
+        const analysis = await deepSeekClient.analyzePaper({ paperId: id, title: parsed.title, packet, images }, settings)
         await researchDatabase.jobs.update(`job-${id}`, { stage: 'indexing', progress: 84, updatedAt: Date.now() })
         await researchDatabase.analyses.put(analysis)
         await paperRepository.updateStatus(id, 'completed')
