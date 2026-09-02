@@ -96,8 +96,9 @@ export class DeepSeekClient {
     const body: Record<string, unknown> = { model, messages, stream: false }
     if (options.maxTokens) body.max_tokens = options.maxTokens
     let response: Response
+    const fetchImpl = this.fetchImpl
     try {
-      response = await this.fetchImpl(endpoint, {
+      response = await fetchImpl(endpoint, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

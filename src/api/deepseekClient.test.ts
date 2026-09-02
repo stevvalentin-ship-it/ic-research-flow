@@ -35,6 +35,16 @@ describe('DeepSeekClient', () => {
     expect(JSON.parse(String(init?.body))).toMatchObject({ model: 'deepseek-v4-flash', max_tokens: 8 })
   })
 
+  it('calls fetch as a plain function so native fetch keeps its browser this-binding', async () => {
+    const fetchImpl = vi.fn(function (this: unknown) {
+      expect(this).toBeUndefined()
+      return Promise.resolve(jsonResponse('{"ok":true}'))
+    }) as unknown as typeof fetch
+    const client = new DeepSeekClient(fetchImpl)
+
+    await expect(client.testConnection(settings)).resolves.toEqual({ ok: true, model: 'deepseek-v4-flash' })
+  })
+
   it.each([
     ['https://api.deepseek.com/v1', 'https://api.deepseek.com/v1/chat/completions'],
     ['https://api.deepseek.com/chat/completions', 'https://api.deepseek.com/chat/completions'],
