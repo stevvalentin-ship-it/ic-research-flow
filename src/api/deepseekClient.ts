@@ -179,4 +179,15 @@ export class DeepSeekClient {
   }
 }
 
-export const deepSeekClient = new DeepSeekClient(fetch, { useOfficialDevProxy: import.meta.env.DEV })
+function isLocalPage(): boolean {
+  if (typeof window === 'undefined') return false
+  const hostname = window.location.hostname
+  return hostname === 'localhost'
+    || hostname.endsWith('.localhost')
+    || hostname === '127.0.0.1'
+    || hostname === '[::1]'
+}
+
+export const deepSeekClient = new DeepSeekClient(fetch, {
+  useOfficialDevProxy: import.meta.env.DEV || isLocalPage(),
+})
