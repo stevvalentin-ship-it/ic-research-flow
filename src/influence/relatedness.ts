@@ -20,7 +20,7 @@ function weightedTerms(paper: PaperRecord, analysis: PaperAnalysis | undefined):
   }
   bump(paper.title, 5)
   bump(paper.abstract ?? '', 3)
-  bump(paper.fullText, 1)
+  bump((paper.fullText ?? '').slice(0, 2000), 1)
   if (analysis) {
     for (const keyword of analysis.keywordsZh ?? []) bump(keyword, 4)
     for (const keyword of analysis.keywordsEn ?? []) bump(keyword, 4)
@@ -50,14 +50,24 @@ function cosine(left: Map<string, number>, right: Map<string, number>): number {
 export function computeRelatednessEdges(papers: PaperRecord[], analyses: PaperAnalysis[]): RelatednessEdge[] {
   const byPaper = new Map(analyses.map((analysis) => [analysis.paperId, analysis]))
   const vectors = papers.map((paper) => ({ id: paper.id, terms: weightedTerms(paper, byPaper.get(paper.id)) }))
-  const edges: RelatednessEdge[] = []
+  const adjacency = new Map<string, Array<{ other: string; weight: number }>>()
+  const allEdges: RelatednessEdge[] = []
   for (let i = 0; i < vectors.length; i += 1) {
     for (let j = i + 1; j < vectors.length; j += 1) {
       const weight = cosine(vectors[i].terms, vectors[j].terms)
       if (weight >= 0.08) {
-        edges.push({ source: vectors[i].id, target: vectors[j].id, weight, relation: 'related' })
+        allEdges.push({ source: vectors[i].id, target: vectors[j].id, weight, relation: 'related' })
+        adjacency.set(vectors[i].id, [...(adjacency.get(vectors[i].id) ?? []), { other: vectors[j].id, weight }])
+        adjacency.set(vectors[j].id, [...(adjacency.get(vectors[j].id) ?? []), { other: vectors[i].id, weight }])
       }
     }
   }
-  return edges.sort((a, b) => b.weight - a.weight)
+  const kept = new Set<string>()
+  for (const [node, neighbors] of adjacency) {
+    for (const neighbor of neighbors.sort((a, b) => b.weight - a.weight).slice(0, 3)) {
+      const key = [node, neighbor.other].sort().join('|')
+      kept.add(key)
+    }
+  }
+  return allEdges.filter((edge) => kept.has([edge.source, edge.target].sort().join('|'))).sort((a, b) => b.weight - a.weight)
 }
