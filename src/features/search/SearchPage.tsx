@@ -48,7 +48,7 @@ function buildLocalScores(papers: PaperRecord[], analyses: PaperAnalysis[], quer
 }
 
 export function SearchPage() {
-  const [query, setQuery] = useState('Chiplet 热管理与 die-to-die 互连协同优化')
+  const [query, setQuery] = useState('')
   const [papers, setPapers] = useState<PaperRecord[]>(demoPapers)
   const [analyses, setAnalyses] = useState<PaperAnalysis[]>(demoAnalyses)
   const [scores, setScores] = useState<PaperScore[]>(demoScores)
