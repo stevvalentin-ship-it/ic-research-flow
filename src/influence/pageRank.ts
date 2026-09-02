@@ -1,10 +1,12 @@
 import type { CitationRelation } from '../domain/types'
 
+export type GraphRelation = CitationRelation | 'related'
+
 export interface InfluenceEdge {
   source: string
   target: string
   weight?: number
-  relation?: CitationRelation
+  relation?: GraphRelation
   selfCitation?: boolean
 }
 
@@ -14,12 +16,13 @@ export interface InfluenceGraph {
   years?: Record<string, number | undefined>
 }
 
-const relationWeight: Record<CitationRelation, number> = {
+const relationWeight: Record<GraphRelation, number> = {
   foundation: 1.25,
   extends: 1.1,
   validates: 1,
   contradicts: 1,
   background: 0.55,
+  related: 0.85,
 }
 
 export function personalizedPageRank(

@@ -6,7 +6,8 @@ import { researchDatabase } from '../../storage/database'
 import { LocalPaperIndex } from '../../search/localSearch'
 import { retrieveCandidates } from '../../search/retrievalPipeline'
 import { personalizedPageRank } from '../../influence/pageRank'
-import { scorePaper } from '../../influence/scoring'
+import { computeRelatednessEdges } from '../../influence/relatedness'
+import { normalizePaperScores, scorePaper } from '../../influence/scoring'
 import { selectDiverseCorePapers } from '../../influence/mmr'
 import { matchLocalReferences } from '../../influence/referenceMatcher'
 import { setGlobalProgress } from '../../storage/globalProgress'
@@ -17,16 +18,19 @@ function buildLocalScores(papers: PaperRecord[], analyses: PaperAnalysis[], quer
   const ids = new Set(papers.map((paper) => paper.id))
   const personalization = queryRelevance
     ?? Object.fromEntries(papers.map((paper, index) => [paper.id, 1 / Math.max(1, papers.length) + index * 1e-9]))
-  const edges = analyses.flatMap((analysis) => analysis.references
+  const citationEdges = analyses.flatMap((analysis) => analysis.references
     .filter((reference) => reference.matchedPaperId && ids.has(reference.matchedPaperId))
     .map((reference) => ({ source: analysis.paperId, target: reference.matchedPaperId!, relation: reference.relation })))
+  const relatedEdges = computeRelatednessEdges(papers, analyses)
+    .map((edge) => ({ source: edge.source, target: edge.target, weight: edge.weight, relation: 'related' as const }))
+  const edges = [...citationEdges, ...relatedEdges]
   const rank = personalizedPageRank({
     nodes: [...ids],
     edges,
     years: Object.fromEntries(papers.map((paper) => [paper.id, paper.year])),
   }, personalization)
   const maxRank = Math.max(...Object.values(rank), 1e-6)
-  return papers.map((paper) => {
+  const scores = papers.map((paper) => {
     const analysis = analyses.find((item) => item.paperId === paper.id)
     const relevance = queryRelevance ? (personalization[paper.id] ?? 0) : 0.5
     const influence = (rank[paper.id] ?? 0) / maxRank
@@ -37,9 +41,10 @@ function buildLocalScores(papers: PaperRecord[], analyses: PaperAnalysis[], quer
     const role = frontier > 0.8 ? 'frontier' as const : influence > 0.72 ? 'hub' as const : 'foundation' as const
     const reason = queryRelevance
       ? '综合主题相关性、本地引用影响力、时间前沿度与证据完整度入选。'
-      : '基于本地引用网络的 PageRank 影响力、时间前沿度与证据完整度综合评分。'
+      : '基于本地引用与语义相关性网络的 PageRank 影响力、时间前沿度与证据完整度综合评分。'
     return { paperId: paper.id, relevance, influence, frontier, evidence, bridge, total, role, reason }
   })
+  return normalizePaperScores(scores)
 }
 
 export function SearchPage() {
