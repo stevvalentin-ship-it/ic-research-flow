@@ -1,5 +1,7 @@
 import { BookOpenText, Boxes, Cpu, FlaskConical, Network, Plus, Search, Settings2, ShieldCheck } from 'lucide-react'
+import { useSyncExternalStore } from 'react'
 import { NavLink, Outlet } from 'react-router-dom'
+import { getGlobalProgress, subscribeGlobalProgress } from '../storage/globalProgress'
 
 const links = [
   { to: '/', label: '投入论文', icon: Plus },
@@ -9,6 +11,8 @@ const links = [
 ]
 
 export function AppShell() {
+  const progress = useSyncExternalStore(subscribeGlobalProgress, getGlobalProgress)
+  const progressPercent = progress.total > 0 ? Math.round((progress.done / progress.total) * 100) : 0
   return (
     <div className="app-shell">
       <header className="topbar">
@@ -27,6 +31,7 @@ export function AppShell() {
         </div>
       </aside>
       <main className="workspace"><Outlet /></main>
+        {progress.active && <div className="global-progress-bar" role="status" aria-live="polite"><span>{progress.label}</span><div className="global-progress-track"><progress value={progress.done} max={Math.max(1, progress.total)} /></div><small>{progressPercent}%</small></div>}
     </div>
   )
 }

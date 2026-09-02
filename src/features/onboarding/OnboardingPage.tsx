@@ -10,6 +10,7 @@ import { buildAnalysisPacket } from '../../ingestion/analysisPacket'
 import { paperRepository } from '../../storage/paperRepository'
 import { researchDatabase } from '../../storage/database'
 import { deepSeekClient } from '../../api/deepseekClient'
+import { setGlobalProgress } from '../../storage/globalProgress'
 
 
 function selectVisionPages(pageCount: number): number[] {
@@ -28,13 +29,18 @@ export function OnboardingPage() {
   const [running, setRunning] = useState(false)
   const [progress, setProgress] = useState({ done: 0, label: '' })
   const [error, setError] = useState('')
+  const updateProgress = (done: number, label: string) => {
+    setProgress({ done, label })
+    setGlobalProgress({ active: true, label, done, total: files.length })
+  }
   const buildLibrary = async () => {
     setRunning(true); setError('')
+    setGlobalProgress({ active: true, label: '准备处理论文…', done: 0, total: files.length })
     let activePaperId = ''
     try {
       for (let index = 0; index < files.length; index += 1) {
         const file = files[index]
-        setProgress({ done: index, label: `正在解析 ${file.name}` })
+        updateProgress(index, `正在解析 ${file.name}`)
         const id = await fingerprintFile(file)
         activePaperId = id
         await researchDatabase.jobs.put({ id: `job-${id}`, paperId: id, stage: 'parsing', progress: 8, attempts: 0, updatedAt: Date.now() })
@@ -54,13 +60,13 @@ export function OnboardingPage() {
               dataUrl: await renderPdfPageAsDataUrl(file, page, { scale: 1.5 }),
             })))
           : []
-        setProgress({ done: index, label: parsed.isScanned ? `DeepSeek 正在识别 ${file.name} 的页面图片` : `DeepSeek 正在理解 ${file.name}` })
+        updateProgress(index, parsed.isScanned ? `DeepSeek 正在识别 ${file.name} 的页面图片` : `DeepSeek 正在理解 ${file.name}`)
         const analysis = await deepSeekClient.analyzePaper({ paperId: id, title: parsed.title, packet, images }, settings)
         await researchDatabase.jobs.update(`job-${id}`, { stage: 'indexing', progress: 84, updatedAt: Date.now() })
         await researchDatabase.analyses.put(analysis)
         await paperRepository.updateStatus(id, 'completed')
         await researchDatabase.jobs.update(`job-${id}`, { stage: 'completed', progress: 100, updatedAt: Date.now() })
-        setProgress({ done: index + 1, label: `${file.name} 已完成` })
+        updateProgress(index + 1, `${file.name} 已完成`)
         activePaperId = ''
       }
       navigate('/library')
@@ -70,7 +76,10 @@ export function OnboardingPage() {
         await paperRepository.updateStatus(activePaperId, 'failed').catch(() => undefined)
       }
       setError(caught instanceof Error ? caught.message : '处理失败，请检查文件与 API 连接。')
-    } finally { setRunning(false) }
+    } finally {
+      setRunning(false)
+      setGlobalProgress({ active: false, label: '', done: 0, total: 0 })
+    }
   }
   return (
     <div className="onboarding-page">
