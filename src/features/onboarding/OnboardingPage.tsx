@@ -15,7 +15,7 @@ export function OnboardingPage() {
   const navigate = useNavigate()
   const [files, setFiles] = useState<File[]>([])
   const [connected, setConnected] = useState(false)
-  const [settings, setSettings] = useState<ApiSettings>({ baseUrl: 'https://api.deepseek.com', model: 'deepseek-chat', apiKey: '' })
+  const [settings, setSettings] = useState<ApiSettings>({ baseUrl: 'https://api.deepseek.com', model: 'deepseek-v4-flash', apiKey: '' })
   const [running, setRunning] = useState(false)
   const [progress, setProgress] = useState({ done: 0, label: '' })
   const [error, setError] = useState('')
