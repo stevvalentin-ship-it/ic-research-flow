@@ -151,20 +151,35 @@ export class DeepSeekClient {
     packet: string
     images?: Array<{ page: number; dataUrl: string }>
   }, settings: ApiSettings): Promise<PaperAnalysis> {
-    const userContent: ChatMessage['content'] = input.images?.length
-      ? [
-          { type: 'text' as const, text: `${analysisUserPrompt(input.title, input.packet)} 若论文文本为空，请根据附带的页面图片识别内容，并严格按相同 JSON 结构输出。` },
-          ...input.images.map((image) => ({
-            type: 'image_url' as const,
-            image_url: { url: image.dataUrl, detail: 'high' as const },
-          })),
-        ]
-      : analysisUserPrompt(input.title, input.packet)
-    const result = await this.chat(settings, [
-      { role: 'system', content: analysisSystemPrompt },
-      { role: 'user', content: userContent },
-    ])
-    return normalizePaperAnalysis(input.paperId, extractJsonObject(result.content))
+    const buildUserContent = (retry: boolean): ChatMessage['content'] => {
+      const base = retry
+        ? `${analysisUserPrompt(input.title, input.packet)} 上一次输出不是严格 JSON。请只输出一个 JSON 对象，不要 Markdown 代码块，不要解释，不要额外文字。`
+        : `${analysisUserPrompt(input.title, input.packet)} 若论文文本为空，请根据附带的页面图片识别内容，并严格按相同 JSON 结构输出。`
+      if (!input.images?.length) return base
+      return [
+        { type: 'text' as const, text: base },
+        ...input.images.map((image) => ({
+          type: 'image_url' as const,
+          image_url: { url: image.dataUrl, detail: 'high' as const },
+        })),
+      ]
+    }
+    let lastError: unknown
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      try {
+        const result = await this.chat(settings, [
+          { role: 'system', content: attempt === 0 ? analysisSystemPrompt : `${analysisSystemPrompt} 必须只输出一个 JSON 对象，严禁输出解释、Markdown 或前缀。` },
+          { role: 'user', content: buildUserContent(attempt > 0) },
+        ])
+        return normalizePaperAnalysis(input.paperId, extractJsonObject(result.content))
+      } catch (error) {
+        lastError = error
+        const retryable = error instanceof Error
+          && (/MODEL_JSON|INVALID_RESPONSE|DeepSeek 返回内容为空|JSON/.test(error.message))
+        if (!retryable || attempt >= 2) throw error
+      }
+    }
+    throw lastError
   }
 
   async expandQuery(query: string, settings: ApiSettings): Promise<QueryExpansion> {

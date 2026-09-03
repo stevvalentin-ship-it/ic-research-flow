@@ -206,7 +206,7 @@ describe('DeepSeekClient', () => {
   })
 
   it('keeps the short probe limit out of paper analysis and still requires analysis content', async () => {
-    const fetchImpl = vi.fn<typeof fetch>().mockResolvedValue(jsonResponse(''))
+    const fetchImpl = vi.fn<typeof fetch>().mockImplementation(() => Promise.resolve(jsonResponse('')))
     const client = new DeepSeekClient(fetchImpl)
 
     await expect(client.analyzePaper({ paperId: 'paper-1', title: 'A paper', packet: 'Abstract text' }, settings))
