@@ -7,12 +7,20 @@ import { LocalPaperIndex } from '../../search/localSearch'
 import { retrieveCandidates } from '../../search/retrievalPipeline'
 import { personalizedPageRank } from '../../influence/pageRank'
 import { computeRelatednessEdges } from '../../influence/relatedness'
-import { normalizePaperScores, scorePaper } from '../../influence/scoring'
+import { scorePaper } from '../../influence/scoring'
 import { selectDiverseCorePapers } from '../../influence/mmr'
 import { matchLocalReferences } from '../../influence/referenceMatcher'
 import { setGlobalProgress } from '../../storage/globalProgress'
 import { GraphWorkbench } from '../graph/GraphWorkbench'
 import { demoAnalyses, demoPapers, demoScores } from './demoData'
+
+function normalizeFeature(values: number[]): number[] {
+  if (!values.length) return []
+  const min = Math.min(...values)
+  const max = Math.max(...values)
+  const range = max - min
+  return values.map((value) => range > 1e-9 ? 0.55 + 0.4 * ((value - min) / range) : 0.75)
+}
 
 function buildLocalScores(papers: PaperRecord[], analyses: PaperAnalysis[], queryRelevance?: Record<string, number>): PaperScore[] {
   const ids = new Set(papers.map((paper) => paper.id))
@@ -20,7 +28,7 @@ function buildLocalScores(papers: PaperRecord[], analyses: PaperAnalysis[], quer
     ?? Object.fromEntries(papers.map((paper, index) => [paper.id, 1 / Math.max(1, papers.length) + index * 1e-9]))
   const citationEdges = analyses.flatMap((analysis) => analysis.references
     .filter((reference) => reference.matchedPaperId && ids.has(reference.matchedPaperId))
-    .map((reference) => ({ source: analysis.paperId, target: reference.matchedPaperId!, relation: reference.relation })))
+    .map((reference) => ({ source: analysis.paperId, target: reference.matchedPaperId!, relation: reference.relation, weight: 1 })))
   const relatedEdges = computeRelatednessEdges(papers, analyses)
     .map((edge) => ({ source: edge.source, target: edge.target, weight: edge.weight, relation: 'related' as const }))
   const edges = [...citationEdges, ...relatedEdges]
@@ -30,21 +38,64 @@ function buildLocalScores(papers: PaperRecord[], analyses: PaperAnalysis[], quer
     years: Object.fromEntries(papers.map((paper) => [paper.id, paper.year])),
   }, personalization)
   const maxRank = Math.max(...Object.values(rank), 1e-6)
-  const scores = papers.map((paper) => {
+  const relatednessSum = new Map<string, number>()
+  for (const edge of edges) {
+    relatednessSum.set(edge.source, (relatednessSum.get(edge.source) ?? 0) + (edge.weight ?? 1))
+    relatednessSum.set(edge.target, (relatednessSum.get(edge.target) ?? 0) + (edge.weight ?? 1))
+  }
+  const currentYear = new Date().getFullYear()
+  const raw = papers.map((paper) => {
     const analysis = analyses.find((item) => item.paperId === paper.id)
-    const relevance = queryRelevance ? (personalization[paper.id] ?? 0) : 0.5
-    const influence = (rank[paper.id] ?? 0) / maxRank
-    const frontier = paper.year ? Math.max(0.2, 1 - (new Date().getFullYear() - paper.year) / 15) : 0.5
-    const evidence = analysis ? Math.min(1, (analysis.evidence?.length ?? 0) / 3 + 0.45) : 0.45
-    const bridge = analysis ? Math.min(1, (analysis.references.filter((reference) => reference.matchedPaperId).length) / 5 + 0.35) : 0.35
-    const total = scorePaper({ relevance, influence, frontier, evidence, bridge })
-    const role = frontier > 0.8 ? 'frontier' as const : influence > 0.72 ? 'hub' as const : 'foundation' as const
-    const reason = queryRelevance
-      ? '综合主题相关性、本地引用影响力、时间前沿度与证据完整度入选。'
-      : '基于本地引用与语义相关性网络的 PageRank 影响力、时间前沿度与证据完整度综合评分。'
-    return { paperId: paper.id, relevance, influence, frontier, evidence, bridge, total, role, reason }
+    const topicCount = new Set([
+      ...(analysis?.domains ?? []).map((item) => item.domain),
+      ...(analysis?.keywordsEn ?? []),
+      ...(analysis?.keywordsZh ?? []),
+      ...(analysis?.facets.objects ?? []),
+      ...(analysis?.facets.methods ?? []),
+    ]).size
+    const evidenceCount = analysis?.evidence?.length ?? 0
+    const facetCount = analysis ? Object.values(analysis.facets).reduce((sum, value) => sum + value.length, 0) : 0
+    const contentRichness = evidenceCount * 2 + facetCount + (paper.pageCount ?? 0) / 20 + ((paper.fullText ?? '').length) / 5000 + ((paper.abstract ?? '').length) / 500
+    const recency = paper.year ? Math.max(0, 1 - (currentYear - paper.year) / 20) : 0.5
+    const citationBridge = analysis?.references.filter((reference) => reference.matchedPaperId).length ?? 0
+    return {
+      id: paper.id,
+      analysis,
+      relevanceRaw: queryRelevance ? (personalization[paper.id] ?? 0) : (relatednessSum.get(paper.id) ?? 0),
+      influenceRaw: (rank[paper.id] ?? 0) / maxRank,
+      frontierRaw: recency + topicCount * 0.01,
+      evidenceRaw: contentRichness,
+      bridgeRaw: topicCount + citationBridge,
+    }
   })
-  return normalizePaperScores(scores)
+  const relevance = normalizeFeature(raw.map((item) => item.relevanceRaw))
+  const influence = normalizeFeature(raw.map((item) => item.influenceRaw))
+  const frontier = normalizeFeature(raw.map((item) => item.frontierRaw))
+  const evidence = normalizeFeature(raw.map((item) => item.evidenceRaw))
+  const bridge = normalizeFeature(raw.map((item) => item.bridgeRaw))
+  return raw.map((item, index) => {
+    const r = relevance[index]
+    const i = influence[index]
+    const f = frontier[index]
+    const e = evidence[index]
+    const b = bridge[index]
+    const total = scorePaper({ relevance: r, influence: i, frontier: f, evidence: e, bridge: b })
+    const role = f > 0.85 ? 'frontier' as const : i > 0.8 ? 'hub' as const : 'foundation' as const
+    const reason = queryRelevance
+      ? '综合主题相关性、本地引用影响力、时间前沿度、证据完整度与跨主题桥接价值入选。'
+      : '基于语义相关性网络、PageRank 影响力、时间前沿度、证据丰富度与主题多样性综合评分。'
+    return {
+      paperId: item.id,
+      relevance: r,
+      influence: i,
+      frontier: f,
+      evidence: e,
+      bridge: b,
+      total,
+      role,
+      reason,
+    }
+  })
 }
 
 export function SearchPage() {
