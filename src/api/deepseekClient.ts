@@ -15,6 +15,7 @@ interface ChatResponse {
 interface ChatOptions {
   maxTokens?: number
   requireContent?: boolean
+  timeoutMs?: number
 }
 
 interface DeepSeekClientOptions {
@@ -101,6 +102,9 @@ export class DeepSeekClient {
     if (options.maxTokens) body.max_tokens = options.maxTokens
     let response: Response
     const fetchImpl = this.fetchImpl
+    const controller = new AbortController()
+    const timeoutMs = options.timeoutMs ?? 90_000
+    const timeout = setTimeout(() => controller.abort(), timeoutMs)
     try {
       response = await fetchImpl(endpoint, {
         method: 'POST',
@@ -109,12 +113,18 @@ export class DeepSeekClient {
           Authorization: `Bearer ${settings.apiKey.trim()}`,
         },
         body: JSON.stringify(body),
+        signal: controller.signal,
       })
-    } catch {
+    } catch (error) {
+      if (controller.signal.aborted) {
+        throw new DeepSeekError('REQUEST_TIMEOUT', 'DeepSeek 请求超时，请检查网络后重试。')
+      }
       throw new DeepSeekError(
         'NETWORK_FAILED',
         '无法访问 API 地址，请检查网络、地址以及接口是否允许当前网页跨域访问。',
       )
+    } finally {
+      clearTimeout(timeout)
     }
     if (!response.ok) {
       const mapped = mapStatus(response.status)

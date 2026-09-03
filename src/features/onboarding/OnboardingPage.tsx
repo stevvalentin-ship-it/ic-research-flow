@@ -36,10 +36,11 @@ export function OnboardingPage() {
   const buildLibrary = async () => {
     setRunning(true); setError('')
     setGlobalProgress({ active: true, label: '准备处理论文…', done: 0, total: files.length })
-    let activePaperId = ''
-    try {
-      for (let index = 0; index < files.length; index += 1) {
-        const file = files[index]
+    const failedNames: string[] = []
+    for (let index = 0; index < files.length; index += 1) {
+      const file = files[index]
+      let activePaperId = ''
+      try {
         updateProgress(index, `正在解析 ${file.name}`)
         const id = await fingerprintFile(file)
         activePaperId = id
@@ -67,20 +68,22 @@ export function OnboardingPage() {
         await paperRepository.updateStatus(id, 'completed')
         await researchDatabase.jobs.update(`job-${id}`, { stage: 'completed', progress: 100, updatedAt: Date.now() })
         updateProgress(index + 1, `${file.name} 已完成`)
-        activePaperId = ''
+      } catch (caught) {
+        if (activePaperId) {
+          await researchDatabase.jobs.update(`job-${activePaperId}`, { stage: 'failed', errorCode: 'PROCESSING_FAILED', errorMessage: caught instanceof Error ? caught.message : '处理失败', updatedAt: Date.now() }).catch(() => undefined)
+          await paperRepository.updateStatus(activePaperId, 'failed').catch(() => undefined)
+        }
+        failedNames.push(file.name)
       }
-      navigate('/library')
-    } catch (caught) {
-      if (activePaperId) {
-        await researchDatabase.jobs.update(`job-${activePaperId}`, { stage: 'failed', errorCode: 'PROCESSING_FAILED', errorMessage: caught instanceof Error ? caught.message : '处理失败', updatedAt: Date.now() })
-        await paperRepository.updateStatus(activePaperId, 'failed').catch(() => undefined)
-      }
-      setError(caught instanceof Error ? caught.message : '处理失败，请检查文件与 API 连接。')
-    } finally {
-      setRunning(false)
-      setGlobalProgress({ active: false, label: '', done: 0, total: 0 })
     }
+    if (failedNames.length) {
+      setError(`有 ${failedNames.length} 篇处理失败：${failedNames.join('、')}`);
+    }
+    navigate('/library')
+    setRunning(false)
+    setGlobalProgress({ active: false, label: '', done: 0, total: 0 })
   }
+
   return (
     <div className="onboarding-page">
       <section className="hero-section">
