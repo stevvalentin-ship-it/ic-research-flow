@@ -1,35 +1,46 @@
 # 芯研流 · IC Research Flow
 
-面向集成电路研究者的纯浏览器论文管理、智能检索与影响力图谱工具。它可以直接部署到 GitHub Pages：每位访问者投入自己的 PDF、填写自己的 DeepSeek 兼容接口，在自己的浏览器里建立独立论文库。
+> 一个“把 PDF 当论文读，把 DeepSeek 当牛马用”的纯浏览器科研小站。
+
+## 这是什么？
+
+面向集成电路研究者的论文管理、智能检索与影响力图谱工具。
+
+它可以直接部署到 GitHub Pages：每位访问者投入自己的 PDF，填写自己的 DeepSeek 兼容接口，在自己的浏览器里建立独立论文库。
+
+**简单说：你的论文不用上传，AI 帮你干活，GitHub 只负责看热闹。**
 
 ## 已实现功能
 
 - 批量投入本地 PDF，使用 SHA-256 去重，PDF.js 按页提取文本。
 - IndexedDB 持久化原始 PDF、论文元数据、结构化分析、处理任务和缓存。
 - DeepSeek 连接测试与集成电路专用结构化分析提示词。
-- 默认使用支持图片的 `deepseek-v4-flash-vision-exp`，也可选择 `deepseek-v4-flash` / `deepseek-v4-pro`；浏览器里遗留的 `deepseek-chat` / `deepseek-reasoner` 配置会自动迁移。
-- 九个 IC 一级知识域，以及对象、问题、方法、工艺节点、指标、应用、发现、局限和参考文献等研究切面。
-- 中英文 IC 术语归一与 MiniSearch 本地全文索引；单次最多召回 50 篇。
-- 带引用语义权重、个性化向量和时间衰减的 IC-Influence Rank。
-- 相关性 40%、影响力 30%、前沿度 15%、证据 10%、桥接性 5% 的透明评分。
-- MMR 多样性筛选，输出最多 15 篇核心论文。
+- 默认支持图片的 `deepseek-v4-flash-vision-exp`，也可以切回 `deepseek-v4-flash` / `deepseek-v4-pro`。
+- 动态主题分类：不搞死板的九大类，根据论文内容“现场总结”侧重点。
+- 论文相关性网络：不是引用关系，是“这俩论文看起来有暧昧”的关系。
+- PageRank 评分：如果它某天不抽风的话，还是挺高级的。
+- 中英文 IC 术语归一与 MiniSearch 本地全文索引。
+- MMR 多样性筛选，输出 12–15 篇核心论文。
 - 内容知识树、影响力网络、核心论文卡片和证据页侧栏。
-- 可恢复的处理状态、单篇失败隔离和浏览器内 PDF 打开。
+- 失败自动重试 + 论文库手动重试按钮，AI 拉胯时我们负责捞。
 
 ## 隐私与版权边界
 
-原始 PDF 不会上传到 GitHub 或本站服务器，而是保存在访问者当前浏览器的 IndexedDB 中。为完成 AI 分类，网站会把从 PDF 中选取的文本片段发送到访问者填写的 DeepSeek 兼容接口。API Key 默认只保存在当前标签会话；只有访问者主动勾选后才写入该浏览器的本地存储。
+- 原始 PDF **不上传 GitHub、不上传本站服务器**，只保存在当前浏览器的 IndexedDB。
+- 只有分析所需的文本片段或页面图片会发送到你配置的 DeepSeek 接口。
+- API Key 默认只保存在当前标签会话；只有你主动勾选后才写入 localStorage。
+- 共享设备上不建议持久化 API Key。
+- 清除网站数据 = 本地论文库和你 say goodbye。
 
-清除该网站的浏览器站点数据会删除本地论文库。共享设备上不建议持久化 API Key。静态网页直接请求 API，因此自定义接口必须允许该 GitHub Pages 域名进行 CORS 请求。
+> 密钥就像内裤：不能随便给人看，更不能提交到仓库。
 
 ## DeepSeek 连接
 
-- 官方 API 地址填写 `https://api.deepseek.com`；也兼容带 `/v1` 的地址或完整的 `/chat/completions` 地址。
-- 远程接口必须使用 HTTPS；为兼容本机模型服务，`localhost` 和 `127.0.0.1` 可使用 HTTP。空地址、相对路径和不安全协议会在发送密钥前被拒绝。
-- 本地开发和 `vite preview` 会将官方地址通过同源代理转发，避免部分内嵌浏览器拦截 DeepSeek 域名；GitHub Pages 静态版则由访问者浏览器直连接口，接口需允许该域名 CORS。
-- 推荐模型为 `deepseek-v4-flash-vision-exp`，适合扫描版/图片型 PDF；纯文字 PDF 也可改用 `deepseek-v4-flash` 或 `deepseek-v4-pro`。
-- “测试连接”只发送一条极短测试消息，不会上传论文。
-- 页面会区分密钥错误、余额不足、模型或地址错误、限流和网络/CORS 错误。复制密钥时首尾多出的空格会自动清理。
+- 官方地址：`https://api.deepseek.com`
+- 也兼容带 `/v1` 或完整 `/chat/completions` 的地址。
+- 远程接口必须是 HTTPS；`localhost` / `127.0.0.1` 允许 HTTP。
+- 本地开发通过 Vite 同源代理转发，避免部分浏览器拦截。
+- GitHub Pages 静态版由访问者浏览器直连接口，接口需要允许 CORS。
 
 ## 本地运行
 
@@ -38,22 +49,26 @@ pnpm install
 pnpm dev
 ```
 
-质量检查：
-
-```bash
-pnpm run test:run
-pnpm run typecheck
-pnpm run build
-```
+如果你用 `npm` 凑合也可以，就是跑起来偶尔像老奶奶过马路。
 
 ## 发布到 GitHub Pages
 
-1. 将本项目推送到 GitHub 仓库的 `main` 分支。
-2. 在仓库 **Settings → Pages → Build and deployment** 中选择 **GitHub Actions**。
-3. 推送后，`.github/workflows/deploy-pages.yml` 会自动测试、构建并发布 `dist`。
-
-Vite 使用相对 `base: './'`，路由使用 `HashRouter`，因此既支持项目子路径 Pages，也不依赖服务器回退规则。
+1. 推送到 GitHub 仓库的 `main` 分支。
+2. 在仓库 Settings → Pages 中选择 GitHub Actions。
+3. 推送后 `.github/workflows/deploy-pages.yml` 会自动测试、构建并发布 `dist`。
 
 ## 技术栈
 
-React 19、TypeScript、Vite、Dexie、PDF.js、MiniSearch、D3、Vitest、GitHub Actions Pages。
+React + TypeScript + Vite + PDF.js + Dexie + MiniSearch + D3 + DeepSeek
+
+简单说就是：一堆前端库手拉手，试图理解你硬盘里的论文。
+
+## 免责声明
+
+- 不提供论文下载，不提供 OCR 魔法，不负责帮你写论文。
+- 扫描版/图片型 PDF 会尽量让 DeepSeek 看一眼；它看懂了是缘分，没看懂是 AI 的问题。
+- 评分、分类、连线都是“尽力而为”，请把它们当参考，不要当真理。
+
+---
+
+祝你的论文早日变成知识树，而不是永远躺在“处理中”。
