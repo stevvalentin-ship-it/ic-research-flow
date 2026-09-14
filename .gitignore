@@ -12,3 +12,13 @@ test-results/
 vite.config.js
 vite.config.d.ts
 outputs/
+
+# Generated PDF.js support assets
+public/pdfjs/
+# Private local runtimes and research data
+data/
+.venv/
+.python/
+.repair-backups/
+*.zip
+*.pdf

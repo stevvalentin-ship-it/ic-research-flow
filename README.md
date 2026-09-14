@@ -1,59 +1,38 @@
-# 芯研流 · IC Research Flow
+# 芯研流 · 浏览器版
 
-面向集成电路研究者的纯浏览器论文管理、智能检索与影响力图谱工具。它可以直接部署到 GitHub Pages：每位访问者投入自己的 PDF、填写自己的 DeepSeek 兼容接口，在自己的浏览器里建立独立论文库。
+纯静态 PDF 双语精读与科研工作台，部署于 GitHub Pages。打开网站即可使用，不需要本机 Python 服务。
 
-## 已实现功能
+网站：https://stevvalentin-ship-it.github.io/ic-research-flow/
 
-- 批量投入本地 PDF，使用 SHA-256 去重，PDF.js 按页提取文本。
-- IndexedDB 持久化原始 PDF、论文元数据、结构化分析、处理任务和缓存。
-- DeepSeek 连接测试与集成电路专用结构化分析提示词。
-- 默认使用支持图片的 `deepseek-v4-flash-vision-exp`，也可选择 `deepseek-v4-flash` / `deepseek-v4-pro`；浏览器里遗留的 `deepseek-chat` / `deepseek-reasoner` 配置会自动迁移。
-- 九个 IC 一级知识域，以及对象、问题、方法、工艺节点、指标、应用、发现、局限和参考文献等研究切面。
-- 中英文 IC 术语归一与 MiniSearch 本地全文索引；单次最多召回 50 篇。
-- 带引用语义权重、个性化向量和时间衰减的 IC-Influence Rank。
-- 相关性 40%、影响力 30%、前沿度 15%、证据 10%、桥接性 5% 的透明评分。
-- MMR 多样性筛选，输出最多 15 篇核心论文。
-- 内容知识树、影响力网络、核心论文卡片和证据页侧栏。
-- 可恢复的处理状态、单篇失败隔离和浏览器内 PDF 打开。
+## 功能
 
-## 隐私与版权边界
+- PDF.js 在浏览器内解析 PDF，SHA-256 去重，原件保存在 IndexedDB。
+- 原文阅读、划词、框选、手写圈画、个人笔记，以及本地 MathJax 公式预览。
+- 明确授权后直连用户配置的模型接口，支持选文解释、普通对话与带来源的论文问答。
+- 分段翻译缓存、人工校对、中文 PDF 重排与段落定位。缺失段落不会冒充完整译文。
+- 本地全文检索、字段与评分权重、PageRank、参考文献候选、人工确认与排除。
+- 导出原件、高亮/圈画 PDF、Markdown 笔记和项目 ZIP；支持导入 Python 3.1 版项目备份。
 
-原始 PDF 不会上传到 GitHub 或本站服务器，而是保存在访问者当前浏览器的 IndexedDB 中。为完成 AI 分类，网站会把从 PDF 中选取的文本片段发送到访问者填写的 DeepSeek 兼容接口。API Key 默认只保存在当前标签会话；只有访问者主动勾选后才写入该浏览器的本地存储。
+## 数据与使用边界
 
-清除该网站的浏览器站点数据会删除本地论文库。共享设备上不建议持久化 API Key。静态网页直接请求 API，因此自定义接口必须允许该 GitHub Pages 域名进行 CORS 请求。
+论文和笔记只保存在当前浏览器，不上传到 GitHub。不同设备、浏览器、域名之间不会自动同步；清除站点数据会删除论文库，请定期导出项目 ZIP。
 
-## DeepSeek 连接
+API Key 默认只保存到标签页会话；只有主动勾选才持久保存。密钥不进入项目包、任务记录或译文缓存。模型接口必须使用 HTTPS 并允许网站域名的跨域（CORS）请求。本站没有模型代理，也不会自动换模型或重试收费请求。
 
-- 官方 API 地址填写 `https://api.deepseek.com`；也兼容带 `/v1` 的地址或完整的 `/chat/completions` 地址。
-- 远程接口必须使用 HTTPS；为兼容本机模型服务，`localhost` 和 `127.0.0.1` 可使用 HTTP。空地址、相对路径和不安全协议会在发送密钥前被拒绝。
-- 本地开发和 `vite preview` 会将官方地址通过同源代理转发，避免部分内嵌浏览器拦截 DeepSeek 域名；GitHub Pages 静态版则由访问者浏览器直连接口，接口需允许该域名 CORS。
-- 推荐模型为 `deepseek-v4-flash-vision-exp`，适合扫描版/图片型 PDF；纯文字 PDF 也可改用 `deepseek-v4-flash` 或 `deepseek-v4-pro`。
-- “测试连接”只发送一条极短测试消息，不会上传论文。
-- 页面会区分密钥错误、余额不足、模型或地址错误、限流和网络/CORS 错误。复制密钥时首尾多出的空格会自动清理。
+关闭页面会中断正在处理的任务；已保存的译文缓存可以继续使用。复杂双栏、公式与图注需要在版式检查中核对。扫描件需先用 OCR 工具生成文字层再导入，或手工补充准确正文。
 
-## 本地运行
+译文 PDF 使用中文嵌入字体，并保留原页或选区核对图。高亮/圈画 PDF 只包含图形标记；文字批注、AI 解释及 LaTeX 请导出 Markdown 或项目 ZIP。加密 PDF 的密码只在页面内存中保留。
 
-```bash
-pnpm install
+从 Python 版迁移时，在旧站点导出每篇论文的项目 ZIP，再在本站导入。旧版项目的现成译文 PDF 可以恢复显示；没有段落映射时，可用缓存重新排版生成映射。失效历史译文不会阻止原件和笔记恢复。
+
+## 开发与部署
+
+```sh
+pnpm install --frozen-lockfile
 pnpm dev
+pnpm build
 ```
 
-质量检查：
+构建产物在 `dist/`。静态部署使用相对资源路径和 Hash 路由，可部署在 GitHub Pages 项目子目录。推送 `main` 后，已有 GitHub Actions 工作流自动构建和发布。
 
-```bash
-pnpm run test:run
-pnpm run typecheck
-pnpm run build
-```
-
-## 发布到 GitHub Pages
-
-1. 将本项目推送到 GitHub 仓库的 `main` 分支。
-2. 在仓库 **Settings → Pages → Build and deployment** 中选择 **GitHub Actions**。
-3. 推送后，`.github/workflows/deploy-pages.yml` 会自动测试、构建并发布 `dist`。
-
-Vite 使用相对 `base: './'`，路由使用 `HashRouter`，因此既支持项目子路径 Pages，也不依赖服务器回退规则。
-
-## 技术栈
-
-React 19、TypeScript、Vite、Dexie、PDF.js、MiniSearch、D3、Vitest、GitHub Actions Pages。
+`browser/` 是当前网页代码；`src/` 保留早期 React 版代码与测试，当前入口不加载它。`scripts/copy-pdf-assets.mjs` 从锁定的 PDF.js 依赖复制字体映射、标准字体和 WASM 资源。MathJax 和 Noto CJK 字体随站点提供，各自许可证位于 `public/vendor/` 和 `public/fonts/`。
