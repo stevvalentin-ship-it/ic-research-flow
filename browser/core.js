@@ -1,3 +1,4 @@
+import {normalizeModel} from './models.js';
 /* Native ES2022 components: no CDN, npm bootstrap, or template/demo data. */
 (() => {
 'use strict';
@@ -16,7 +17,9 @@ C.icon=(name,cls='')=>`<svg class="icon ${cls}" viewBox="0 0 24 24" fill="none" 
 C.profile=()=>{
  const saved=C.read('icrf.v3.profile',{}),p=saved&&typeof saved==='object'?saved:{};
  const key=C.read('icrf.v3.key','','session')||C.read('icrf.v3.key','');
- return {base_url:typeof p.base_url==='string'?p.base_url:'https://api.deepseek.com',model:typeof p.model==='string'?p.model:'',api_key:typeof key==='string'?key:''};
+ const base_url=typeof p.base_url==='string'?p.base_url:'https://api.deepseek.com',model=normalizeModel(base_url,p.model);
+ if(typeof p.model==='string'&&model!==p.model)C.write('icrf.v3.profile',{...p,model});
+ return {base_url,model,api_key:typeof key==='string'?key:''};
 };
 C.validateProfile=(profile,{requireKey=true,requireModel=true}={})=>{
  if(!profile||typeof profile!=='object')throw new Error('模型配置无效，请到「设置与数据」重新保存。');

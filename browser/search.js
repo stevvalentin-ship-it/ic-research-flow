@@ -1,3 +1,4 @@
+import {scanReferences,citationTitles} from './references.js';
 const relations={foundation:1.25,extends:1.1,validates:1,contradicts:1,background:.55};
 const normalize=s=>String(s||'').normalize('NFKC').toLowerCase().replace(/[^\p{L}\p{N}]+/gu,' ').trim();
 export function tokens(text){
@@ -6,32 +7,7 @@ export function tokens(text){
 }
 const terms=p=>new Set(tokens(`${p.title} ${(p.tags||[]).join(' ')}`));
 const similarity=(a,b)=>{const x=terms(a),y=terms(b);return [...x].filter(t=>y.has(t)).length/(new Set([...x,...y]).size||1)};
-export function discoverReferences(papers){
-  const edges=[];
-  for(const source of papers){
-    let inReferences=false;
-    for(const pg of source.manifest.pages){
-      const text=pg.text||'',match=/(?:^|\n)\s*(?:\d+[. ]\s*)?(References|Bibliography|参考文献)\s*(?:\n|$)/i.exec(text);
-      if(match)inReferences=true;
-      if(!inReferences)continue;
-      const refs=match?text.slice(match.index+match[0].length):text,norm=normalize(refs);
-      for(const target of papers){
-        if(source.id===target.id||edges.some(e=>e.source===source.id&&e.target===target.id))continue;
-        const doi=String(target.doi||'').replace(/^https?:\/\/(?:dx\.)?doi.org\//i,'').trim().toLowerCase();
-        const title=normalize(target.title);const doiAt=doi?refs.toLowerCase().indexOf(doi):-1;
-        const titleAt=title.length>=20&&tokens(title).length>=4?norm.indexOf(title):-1;
-        if(doiAt<0&&titleAt<0)continue;
-        // Locate the title in the original text while tolerating PDF line breaks/punctuation.
-        const titlePattern=title.split(' ').map(s=>s.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')).join('[^\\p{L}\\p{N}]+');
-        const rawTitle=titleAt>=0?new RegExp(titlePattern,'iu').exec(refs):null;
-        const start=doiAt>=0?doiAt:rawTitle?.index??0,length=doiAt>=0?doi.length:rawTitle?.[0].length??1500;
-        const evidence=refs.slice(Math.max(0,start-160),start+length+180);
-        edges.push({source:source.id,target:target.id,relation:'background',confirmed:false,page:pg.page,evidence,evidenceLabel:doiAt>=0?'参考文献 DOI 匹配':'参考文献完整标题匹配'});
-      }
-    }
-  }
-  return edges;
-}
+export const discoverReferences=papers=>scanReferences(papers).edges;
 export function pageRank(ids,edges,{damping=.85,personalization={},weights=relations}={}){
   if(!ids.length)return {};
   const total=ids.reduce((s,id)=>s+Math.max(0,personalization[id]||0),0);
@@ -49,12 +25,13 @@ export function pageRank(ids,edges,{damping=.85,personalization={},weights=relat
 export function buildGraph(papers,saved=[],options={}){
   const ids=new Set(papers.map(p=>p.id));const valid=saved.filter(e=>ids.has(e.source)&&ids.has(e.target));
   const excluded=valid.filter(e=>e.excluded),confirmed=valid.filter(e=>!e.excluded);
-  const automatic=discoverReferences(papers).filter(e=>!valid.some(x=>x.source===e.source&&x.target===e.target));
+  const scanned=scanReferences(papers);
+  const automatic=scanned.edges.filter(e=>!valid.some(x=>x.source===e.source&&x.target===e.target));
   const edges=[...confirmed.map(e=>({...e,confirmed:true})),...automatic];
   const ranks=pageRank([...ids],edges.filter(e=>e.confirmed||options.include_candidates));
-  const similarities=[];
-  if(options.similarity)for(let i=0;i<papers.length;i++)for(let j=i+1;j<papers.length;j++){const score=similarity(papers[i],papers[j]);if(score>.2)similarities.push({source:papers[i].id,target:papers[j].id,relation:'similarity',score,sharedTerms:[...terms(papers[i])].filter(t=>terms(papers[j]).has(t))});}
-  return {nodes:papers.map(p=>({id:p.id,title:p.title,year:p.year,tags:p.tags,rank:ranks[p.id]})),edges,excluded,similarities,diagnostics:{confirmedEdges:confirmed.length,candidateEdges:automatic.length,rankedEdges:edges.filter(e=>e.confirmed||options.include_candidates).length,ranks,scope:'仅当前浏览器论文库；主题相似不参与排名。'}};
+  const similarities=[],topicPapers=papers.map(p=>({...p,title:citationTitles(p)[0]||p.title}));
+  if(options.similarity)for(let i=0;i<papers.length;i++)for(let j=i+1;j<papers.length;j++){const score=similarity(topicPapers[i],topicPapers[j]);if(score>.2)similarities.push({source:papers[i].id,target:papers[j].id,relation:'similarity',score,sharedTerms:[...terms(topicPapers[i])].filter(t=>terms(topicPapers[j]).has(t))});}
+  return {nodes:papers.map(p=>({id:p.id,title:p.title,year:p.year,tags:p.tags,rank:ranks[p.id]})),edges,excluded,similarities,diagnostics:{topicSimilarity:{enabled:!!options.similarity,threshold:.2,pairs:similarities.length,method:'完整标题/标签 Jaccard；短标题由原文件名补足'},referenceScan:scanned.diagnostics,confirmedEdges:confirmed.length,candidateEdges:automatic.length,rankedEdges:edges.filter(e=>e.confirmed||options.include_candidates).length,ranks,scope:'仅当前浏览器论文库；主题相似不参与排名。'}};
 }
 export function searchPapers(papers,saved,args={}){
   const query=[...new Set(tokens(args.query))];if(!query.length)return {results:[],diagnostics:{candidates:0,hits:0}};

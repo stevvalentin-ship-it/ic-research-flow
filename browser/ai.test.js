@@ -2,6 +2,13 @@
 import {it,expect,vi} from 'vitest';
 import {validateProfile,requestAI,complete,endpoint} from './ai.js';
 const profile={base_url:'https://model.example/v1',model:'chosen-model',api_key:'test-secret'};
+it('upgrades legacy official DeepSeek IDs at the request boundary, preserving other providers',async()=>{
+  const fetchImpl=vi.fn().mockImplementation(()=>Promise.resolve(Response.json({choices:[{message:{content:'ok'}}]})));
+  for(const [base_url,expected] of [['https://api.deepseek.com','deepseek-flash'],['https://model.example/v1','deepseek-v4-flash-vision-exp']]){
+    await complete({...profile,base_url,model:'deepseek-v4-flash-vision-exp'},[],{fetchImpl});
+    expect(JSON.parse(fetchImpl.mock.calls.at(-1)[1].body).model).toBe(expected);
+  }
+});
 it('rejects unsafe destinations before sending a credential',async()=>{
   const fetchImpl=vi.fn();
   for(const base_url of ['http://evil.example','https://user:pass@model.example','https://model.example?key=foo','javascript:alert(1)'])await expect(requestAI({...profile,base_url},'models',null,{fetchImpl})).rejects.toThrow();
