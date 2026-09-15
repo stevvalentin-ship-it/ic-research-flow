@@ -15,6 +15,7 @@ outputs/
 
 # Generated PDF.js support assets
 public/pdfjs/
+public/vendor/typst/
 # Private local runtimes and research data
 data/
 .venv/

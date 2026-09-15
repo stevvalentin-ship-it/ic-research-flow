@@ -33,4 +33,13 @@ describe('browser research evidence',()=>{
     expect(discoverReferences([source,target])[0].evidence).toContain(target.title);
     expect(searchPapers([target],[],{query:'SRAM',weights:{relevance:0,influence:0,recency:0,evidence:0,bridge:0}}).results[0].score).toBeGreaterThan(0);
   });
+  it('uses the full filename for topic similarity without adding citation edges or changing ranks',()=>{
+    const a={...paper('a','cuZK','No bibliography.'),filename:'06：cuZK：Accelerating Zero-Knowledge Proof with A Faster Parallel Multi-Scalar Multiplication Algorithm on GPUs.pdf'};
+    const b=paper('b','04：PipeZK：Accelerating Zero-Knowledge Proof with a Pipelined Architecture','No bibliography.');
+    const off=buildGraph([a,b]),on=buildGraph([a,b],[],{similarity:true});
+    expect(off.similarities).toEqual([]);expect(on.similarities).toHaveLength(1);
+    expect(on.similarities[0]).toMatchObject({source:'a',target:'b',relation:'similarity'});
+    expect(on.similarities[0].sharedTerms).toContain('proof');expect(on.edges).toEqual([]);
+    expect(on.diagnostics.ranks).toEqual(off.diagnostics.ranks);
+  });
 });

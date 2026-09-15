@@ -1,3 +1,4 @@
+import {normalizeModel} from './models.js';
 export function validateProfile(p,{requireKey=true,requireModel=true}={}){
   let u;try{u=new URL(p?.base_url)}catch{throw new Error('请填写完整的 HTTPS API 基础地址。')}
   if(u.protocol!=='https:'||u.username||u.password||u.search||u.hash||/[\x00-\x20\x7f]/.test(p.base_url))throw new Error('API 地址须为 HTTPS，且不含账号、查询参数或片段。');
@@ -27,6 +28,7 @@ export async function requestAI(profile,kind,payload,{signal,fetchImpl=fetch,tim
   }finally{clearTimeout(timeout);signal?.removeEventListener('abort',abort)}
 }
 export async function complete(profile,messages,options={}){
+  profile={...profile,model:normalizeModel(profile.base_url,profile.model)};
   const data=await requestAI(profile,'chat/completions',{model:profile.model.trim(),messages,stream:false},options);
   const text=data.choices?.[0]?.message?.content;
   if(typeof text!=='string'||!text.trim())throw new Error('模型返回空内容，请核对模型是否支持聊天。');
